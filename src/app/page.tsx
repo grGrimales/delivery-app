@@ -27,7 +27,7 @@ export default function Home() {
             <button
               key={lang.code}
               onClick={() => setLanguage(lang.code)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer ${
                 language === lang.code
                   ? 'bg-white text-blue-600 shadow-md scale-105'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
