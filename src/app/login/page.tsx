@@ -10,11 +10,8 @@ import Link from 'next/link';
 export default function LoginPage() {
   const { t, language, setLanguage } = useConfig();
   const { login } = useAuth();
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,7 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
       await login(formData);
     } catch (err: any) {
@@ -35,18 +32,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 transition-colors duration-500 selection:bg-orange-100 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 selection:bg-orange-100 font-sans relative overflow-hidden">
 
-      {/* Selector de Idioma Minimalista */}
-      <div className="absolute top-6 right-6 flex items-center gap-1 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
-        <div className="flex items-center px-2 border-r border-slate-100 mr-1">
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-50 rounded-full blur-[120px] opacity-60" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-slate-200 rounded-full blur-[120px] opacity-40" />
+
+      <div className="absolute top-8 right-8 flex items-center gap-1 bg-white/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-sm border border-white/50 z-10">
+        <div className="px-2 border-r border-slate-200/50 mr-1">
           <Globe className="h-3.5 w-3.5 text-slate-400" />
         </div>
         {(['es', 'pt', 'en'] as Language[]).map((l) => (
           <button
             key={l}
             onClick={() => setLanguage(l)}
-            className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all duration-300 ${language === l ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'text-slate-500 hover:bg-slate-50'
+            className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all duration-300 ${language === l
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-500 hover:bg-white'
               }`}
           >
             {l.toUpperCase()}
@@ -54,107 +55,96 @@ export default function LoginPage() {
         ))}
       </div>
 
-      <div className="max-w-md w-full space-y-8 bg-white p-10 md:p-12 rounded-[3rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.08)] border border-slate-100 animate-in fade-in zoom-in duration-700">
+      <div className="max-w-md w-full space-y-8 bg-white/80 backdrop-blur-2xl p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white relative z-10 animate-in fade-in zoom-in duration-700">
 
-        {/* Header Section */}
         <div className="text-center">
-          <div className="mx-auto h-20 w-20 bg-gradient-to-tr from-slate-900 to-slate-800 rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl shadow-slate-200 rotate-6 hover:rotate-0 transition-all duration-500 group">
-            <LogIn className="h-10 w-10 text-orange-500 group-hover:scale-110 transition-transform" />
+          <div className="mx-auto h-16 w-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-200 -rotate-2 hover:rotate-0 transition-all duration-500 group cursor-pointer">
+            <LogIn className="h-8 w-8 text-white group-hover:scale-110 transition-transform" />
           </div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
             {authT.login_title}
           </h2>
-          <div className="flex items-center justify-center gap-2">
-            <span className="h-px w-8 bg-slate-100"></span>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">
-              {authT.login_subtitle}
-            </p>
-            <span className="h-px w-8 bg-slate-100"></span>
-          </div>
+          <p className="text-sm font-medium text-slate-400">
+            {language === 'es' ? 'Gestiona tus entregas en tiempo real' : language === 'pt' ? 'Gerencie suas entregas em tempo real' : 'Manage your deliveries in real-time'}
+          </p>
         </div>
 
-        {/* Error Feedback */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-2">
-            <div className="h-8 w-8 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
-              <AlertCircle size={18} />
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-2">
+            <div className="h-7 w-7 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm shadow-red-100">
+              <AlertCircle size={14} />
             </div>
             {error}
           </div>
         )}
 
-        {/* Login Form */}
-        <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">
+        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
                 {authT.email}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-4.5 w-4.5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                 </div>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="block w-full pl-12 pr-5 py-4.5 border border-slate-100 rounded-[1.5rem] bg-slate-50/50 text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all sm:text-sm shadow-sm"
+                  className="block w-full pl-11 pr-4 py-3.5 border border-slate-100 rounded-2xl bg-white text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all sm:text-sm"
                   placeholder="admin@delivery.com"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
                 {authT.password}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-4.5 w-4.5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                 </div>
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="block w-full pl-12 pr-5 py-4.5 border border-slate-100 rounded-[1.5rem] bg-slate-50/50 text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all sm:text-sm shadow-sm"
+                  className="block w-full pl-11 pr-4 py-3.5 border border-slate-100 rounded-2xl bg-white text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all sm:text-sm"
                   placeholder="••••••••"
                 />
               </div>
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center gap-3 py-4 px-4 text-sm font-bold rounded-2xl text-white bg-slate-900 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all duration-300 shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <span className="tracking-wide">{authT.submit_login}</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex justify-center items-center gap-3 py-4 text-sm font-black rounded-2xl text-white bg-slate-900 hover:bg-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-500/30 transition-all duration-300 shadow-xl shadow-slate-200 active:scale-[0.97] disabled:opacity-70"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <span className="tracking-wide uppercase text-[12px]">{authT.submit_login}</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
         </form>
 
-        {/* Footer Link */}
-        <div className="pt-8 text-center border-t border-slate-50">
-          <p className="text-sm font-medium text-slate-400 mb-3">
-            {language === 'es' ? '¿Nuevo en la plataforma?' : language === 'pt' ? 'Novo na plataforma?' : 'New here?'}
-          </p>
-          <Link 
-            href="/register" 
-            className="inline-flex items-center gap-2 text-sm font-bold text-orange-600 hover:text-orange-700 transition-all group"
+        <div className="pt-6 text-center">
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-orange-600 transition-all group"
           >
             {authT.no_account}
-            <div className="h-7 w-7 rounded-full bg-orange-50 flex items-center justify-center group-hover:translate-x-1 transition-transform">
-              <span className="text-lg leading-none">→</span>
+            <div className="h-6 w-6 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-orange-50 group-hover:text-orange-600 transition-all">
+              <ArrowRight size={12} />
             </div>
           </Link>
         </div>

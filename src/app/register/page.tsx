@@ -10,7 +10,7 @@ import Link from 'next/link';
 export default function RegisterPage() {
   const { t, language, setLanguage } = useConfig();
   const { register } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,7 +26,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
       await register(formData);
     } catch (err: any) {
@@ -37,18 +37,22 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12 transition-colors duration-500 selection:bg-orange-100 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 py-12 selection:bg-orange-100 font-sans relative overflow-hidden">
 
-      {/* Selector de Idioma Minimalista */}
-      <div className="absolute top-6 right-6 flex items-center gap-1 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
-        <div className="flex items-center px-2 border-r border-slate-100 mr-1">
+      <div className="absolute top-[-5%] right-[-5%] w-[35%] h-[35%] bg-orange-50 rounded-full blur-[100px] opacity-70" />
+      <div className="absolute bottom-[-5%] left-[-5%] w-[35%] h-[35%] bg-slate-200 rounded-full blur-[100px] opacity-50" />
+
+      <div className="absolute top-8 right-8 flex items-center gap-1 bg-white/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-sm border border-white/50 z-10">
+        <div className="px-2 border-r border-slate-200/50 mr-1">
           <Globe className="h-3.5 w-3.5 text-slate-400" />
         </div>
         {(['es', 'pt', 'en'] as Language[]).map((l) => (
           <button
             key={l}
             onClick={() => setLanguage(l)}
-            className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all duration-300 ${language === l ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'text-slate-500 hover:bg-slate-50'
+            className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all duration-300 ${language === l
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-500 hover:bg-white'
               }`}
           >
             {l.toUpperCase()}
@@ -56,125 +60,117 @@ export default function RegisterPage() {
         ))}
       </div>
 
-      <div className="max-w-md w-full space-y-8 bg-white p-10 md:p-12 rounded-[3rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.08)] border border-slate-100 animate-in fade-in zoom-in duration-700">
+      <div className="max-w-md w-full space-y-8 bg-white/80 backdrop-blur-2xl p-8 md:p-12 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white relative z-10 animate-in fade-in zoom-in duration-700">
 
         {/* Header Section */}
         <div className="text-center">
-          <div className="mx-auto h-20 w-20 bg-gradient-to-tr from-orange-600 to-amber-400 rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl shadow-orange-200 -rotate-3 hover:rotate-0 transition-all duration-500 group">
-            <UserPlus className="h-10 w-10 text-white group-hover:scale-110 transition-transform" />
+          <div className="mx-auto h-16 w-16 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-100 rotate-3 hover:rotate-0 transition-all duration-500 group">
+            <UserPlus className="h-8 w-8 text-white group-hover:scale-110 transition-transform" />
           </div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
             {authT.register_title}
           </h2>
-          <div className="flex items-center justify-center gap-2">
-            <span className="h-px w-8 bg-slate-100"></span>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">
-              {authT.register_subtitle}
-            </p>
-            <span className="h-px w-8 bg-slate-100"></span>
-          </div>
+          <p className="text-sm font-medium text-slate-400 italic">
+            {language === 'es' ? 'Crea tu cuenta de profesional' : language === 'pt' ? 'Crie sua conta profissional' : 'Create your professional account'}
+          </p>
         </div>
 
-        {/* Error Feedback */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-2">
-            <div className="h-8 w-8 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
-              <AlertCircle size={18} />
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[13px] font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-2">
+            <div className="h-7 w-7 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm shadow-red-100">
+              <AlertCircle size={14} />
             </div>
             {error}
           </div>
         )}
 
-        {/* Register Form */}
-        <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">
+        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            {/* Name Field */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
                 {authT.name}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <User className="h-4.5 w-4.5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                 </div>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="block w-full pl-12 pr-5 py-4.5 border border-slate-100 rounded-[1.5rem] bg-slate-50/50 text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all sm:text-sm shadow-sm"
+                  className="block w-full pl-11 pr-4 py-3 border border-slate-100 rounded-2xl bg-white text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all sm:text-sm"
                   placeholder="John Doe"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
                 {authT.email}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-4.5 w-4.5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                 </div>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="block w-full pl-12 pr-5 py-4.5 border border-slate-100 rounded-[1.5rem] bg-slate-50/50 text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all sm:text-sm shadow-sm"
+                  className="block w-full pl-11 pr-4 py-3 border border-slate-100 rounded-2xl bg-white text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all sm:text-sm"
                   placeholder="name@example.com"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
                 {authT.password}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-4.5 w-4.5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                 </div>
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="block w-full pl-12 pr-5 py-4.5 border border-slate-100 rounded-[1.5rem] bg-slate-50/50 text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all sm:text-sm shadow-sm"
-                  placeholder="••••••••"
+                  className="block w-full pl-11 pr-4 py-3 border border-slate-100 rounded-2xl bg-white text-slate-900 font-semibold placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all sm:text-sm"
                 />
               </div>
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center gap-3 py-4.5 px-6 text-sm font-bold rounded-2xl text-white bg-slate-900 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all duration-300 shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 min-h-[56px]"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <span>{authT.submit_register}</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex justify-center items-center gap-3 py-4 text-sm font-black rounded-2xl text-white bg-slate-900 hover:bg-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-500/30 transition-all duration-300 shadow-xl shadow-slate-200 active:scale-[0.97] disabled:opacity-70"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <span className="tracking-wide uppercase text-[12px]">{authT.submit_register}</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
         </form>
 
-        {/* Footer Link */}
-        <div className="pt-8 text-center border-t border-slate-50">
-          <p className="text-sm text-slate-400 font-medium">
-            {authT.have_account}{' '}
-            <Link 
-              href="/login" 
-              className="font-bold text-orange-600 hover:text-orange-700 transition-colors underline underline-offset-4 decoration-orange-200 hover:decoration-orange-500"
-            >
-              {language === 'pt' ? 'Entre agora' : language === 'es' ? 'Entra ahora' : 'Login now'}
-            </Link>
+        <div className="pt-6 text-center">
+          <p className="text-xs font-medium text-slate-400 mb-4">
+            {authT.have_account}
           </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 px-6 py-2 text-xs font-bold text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-100"
+          >
+            <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+            {language === 'pt' ? 'Voltar ao Login' : language === 'es' ? 'Volver al Login' : 'Back to Login'}
+          </Link>
         </div>
       </div>
     </div>
