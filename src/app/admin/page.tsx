@@ -8,6 +8,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { MapPin, Navigation, Package, Loader2, Wifi, WifiOff, X } from 'lucide-react';
 import { assignDriver, createOrder, getOrders } from '@/lib/orders';
 import OrderModal from '@/components/admin/OrderModal';
+import { getAvailableDrivers } from '@/lib/users';
 
 const MapWithNoSSR = dynamic(
   () => import('@/components/map/DeliveryMap'),
@@ -16,7 +17,9 @@ const MapWithNoSSR = dynamic(
     loading: () => (
       <div className="flex flex-col items-center justify-center h-full w-full bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-2" />
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Iniciando Mapa...</span>
+        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
+          Iniciando Mapa...
+        </span>
       </div>
     )
   }
@@ -30,10 +33,11 @@ export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [drivers, setDrivers] = useState<any[]>([]);
 
   const adminT = t.admin;
   const statusT = t.status;
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCreateOrder = async (orderData: any) => {
     try {
@@ -47,12 +51,14 @@ export default function AdminDashboardPage() {
   const handleAssign = async (orderId: string, driverId: string) => {
     try {
       await assignDriver(orderId, driverId, token!);
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'preparing' } : o));
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'PREPARING' } : o));
+      setSelectedOrder(null); // Cerramos el detalle al asignar
     } catch (err) {
       console.error("Error al asignar");
     }
   };
 
+  // Carga inicial de órdenes
   useEffect(() => {
     async function fetchInitialData() {
       if (!token) return;
@@ -68,6 +74,7 @@ export default function AdminDashboardPage() {
     fetchInitialData();
   }, [token]);
 
+  // Sockets
   useEffect(() => {
     if (!socket) return;
 
@@ -86,31 +93,44 @@ export default function AdminDashboardPage() {
     };
   }, [socket]);
 
+  useEffect(() => {
+    async function loadDrivers() {
+      if (!token) return;
+      try {
+        const data = await getAvailableDrivers(token);
+        setDrivers(data);
+      } catch (error) {
+        console.error("Error cargando repartidores:", error);
+      }
+    }
+    loadDrivers();
+  }, [token]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 p-4 lg:p-8">
       <header className="flex items-center justify-between">
         <div>
-
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">{adminT.title}</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">{adminT.desc}</p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-orange-600 transition-all flex items-center gap-2"
-        >
-          <Package size={18} />
-          {language === 'es' ? 'Nueva Orden' : 'New Order'}
-        </button>
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
-          }`}>
-          {isConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
-          {isConnected ? 'SISTEMA LIVE' : 'DESCONECTADO'}
+        <div className="flex gap-4">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-orange-600 transition-all flex items-center gap-2"
+          >
+            <Package size={18} />
+            {language === 'es' ? 'Nueva Orden' : language === 'pt' ? 'Novo Pedido' : 'New Order'}
+          </button>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+            {isConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
+            {isConnected ? 'SISTEMA LIVE' : 'DESCONECTADO'}
+          </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-        {/* Lista de Órdenes */}
+        {/* Panel Lateral: Lista de Órdenes o Detalle de Asignación */}
         <section className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col h-[700px]">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
@@ -118,7 +138,7 @@ export default function AdminDashboardPage() {
               {adminT.current_orders}
             </h3>
             <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg shadow-slate-200">
-              {orders.length} TOTAL
+              {orders.length} {adminT.active.toUpperCase()}
             </span>
           </div>
 
@@ -126,13 +146,73 @@ export default function AdminDashboardPage() {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3">
                 <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-                <span className="text-xs font-black uppercase tracking-[0.2em]">Sincronizando...</span>
+              </div>
+            ) : selectedOrder ? (
+              <div className="bg-slate-900 text-white p-6 rounded-[2rem] h-full flex flex-col animate-in slide-in-from-right duration-300">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="font-black text-sm uppercase tracking-widest text-orange-500">
+                    Pedido #{selectedOrder.id.split('-')[0]}
+                  </h4>
+                  <button
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-2 hover:bg-slate-800 rounded-full transition-colors"
+                  >
+                    <X size={18} className="text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+
+                <div className="mb-6 space-y-3 flex-shrink-0">
+                  <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Origen:</p>
+                    <p className="text-xs font-medium text-slate-300 truncate">{selectedOrder.addressFrom}</p>
+                  </div>
+                  <div className="bg-slate-800/50 p-4 rounded-xl border border-orange-500/20">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Destino Final:</p>
+                    <p className="text-sm font-bold text-white truncate">{selectedOrder.addressTo}</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+                    Repartidores Disponibles
+                  </p>
+
+                  <div className="space-y-2">
+                    {drivers.length === 0 ? (
+                      <div className="text-center py-10 bg-slate-800/30 rounded-2xl border border-dashed border-slate-700">
+                        <p className="text-xs text-slate-500 italic">No hay repartidores en línea...</p>
+                      </div>
+                    ) : (
+                      drivers.map(driver => (
+                        <button
+                          key={driver.id}
+                          onClick={() => handleAssign(selectedOrder.id, driver.id)}
+                          className="w-full flex items-center justify-between p-4 bg-slate-800 border border-slate-700 hover:bg-orange-600 hover:border-orange-500 rounded-2xl transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 bg-slate-700 text-slate-300 rounded-full flex items-center justify-center font-bold text-xs uppercase group-hover:bg-white/20 group-hover:text-white transition-colors">
+                              {driver.name.substring(0, 2)}
+                            </div>
+                            <span className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">
+                              {driver.name}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-md group-hover:bg-white group-hover:text-orange-600 group-hover:border-transparent transition-all">
+                            ASIGNAR
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             ) : orders.length === 0 ? (
               <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                 <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Sin órdenes activas</p>
               </div>
             ) : (
+              // LISTA NORMAL DE ÓRDENES
               orders.map((order: any) => (
                 <div
                   key={order.id}
@@ -148,7 +228,7 @@ export default function AdminDashboardPage() {
                     </span>
                     <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-[0.15em] shadow-sm ${selectedOrder?.id === order.id ? 'bg-orange-500 text-white' : 'bg-white text-slate-900 border border-slate-100'
                       }`}>
-                      {statusT[order.status as keyof typeof statusT] || order.status}
+                      {statusT[order.status.toUpperCase() as keyof typeof statusT] || order.status}
                     </span>
                   </div>
 
@@ -176,9 +256,8 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
+        {/* MAPA */}
         <section className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-100 h-[700px] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.02)] z-0">
-
-
           <div className="absolute inset-0">
             <MapWithNoSSR
               orders={orders}
@@ -188,12 +267,13 @@ export default function AdminDashboardPage() {
           </div>
         </section>
       </div>
+
+      {/* MODAL */}
       <OrderModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateOrder}
       />
     </div>
-
   );
 }
