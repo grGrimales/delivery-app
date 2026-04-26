@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
+    console.log("Token encontrado en localStorage:", savedToken);
     const savedUser = localStorage.getItem('user');
     if (savedToken && savedUser) {
       setToken(savedToken);
@@ -37,12 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    
-    setToken(data.access_token);
+
+    setToken(data.token);
     setUser(data.user);
-    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    
+
     // Redirect based on role
     if (data.user.role === 'ADMIN') router.push('/admin');
     else if (data.user.role === 'DRIVER') router.push('/driver');

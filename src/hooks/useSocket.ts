@@ -1,29 +1,38 @@
 import { useEffect, useState } from 'react';
-import { socket } from '@/lib/socket';
+import { io, Socket } from 'socket.io-client';
 
-export const useSocket = () => {
-  const [isConnected, setIsConnected] = useState(socket.connected);
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+export const useSocket = (token: string | null) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    function onConnect() {
+    if (!token) return;
+
+    const socketInstance = io(SOCKET_URL, {
+      auth: {
+        token: token,
+      },
+      transports: ['websocket'],
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('🔌 Conectado al Gateway de NestJS');
       setIsConnected(true);
-    }
+    });
 
-    function onDisconnect() {
+    socketInstance.on('disconnect', () => {
+      console.log('❌ Desconectado del Gateway');
       setIsConnected(false);
-    }
+    });
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-
-    socket.connect();
+    setSocket(socketInstance);
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.disconnect();
+      socketInstance.disconnect();
     };
-  }, []);
+  }, [token]);
 
   return { socket, isConnected };
 };

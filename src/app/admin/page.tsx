@@ -1,184 +1,167 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useAuth } from '@/hooks/useAuth';
 import { useConfig } from '@/hooks/useConfig';
-import { OrderCard } from '@/components/orders/OrderCard';
-import { StatusBadge } from '@/components/orders/StatusBadge';
-import { Order } from '@/types';
+import { useSocket } from '@/hooks/useSocket';
+import { MapPin, Navigation, Package, Loader2, Wifi, WifiOff, X } from 'lucide-react';
+import { getOrders } from '@/lib/orders';
 
-// Dynamically import the map to avoid SSR issues
-const DeliveryMap = dynamic(() => import('@/components/map/DeliveryMap'), { 
-  ssr: false,
-  loading: () => (
-    <div className="h-full w-full bg-slate-50 animate-pulse flex flex-col items-center justify-center text-slate-400 gap-3">
-      <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-      <span className="font-medium">Carregando mapa...</span>
-    </div>
-  )
-});
+const MapWithNoSSR = dynamic(
+  () => import('@/components/map/DeliveryMap'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-col items-center justify-center h-full w-full bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-2" />
+        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Iniciando Mapa...</span>
+      </div>
+    )
+  }
+);
 
-// Mock data for initial UI
-const MOCK_ORDERS: Order[] = [
-  { 
-    id: 'ord-101', 
-    status: 'ON_WAY', 
-    customerName: 'Carlos Oliveira', 
-    address: 'Av. Paulista, 1000 - SP', 
-    createdAt: new Date().toISOString(),
-    currentLocation: { lat: -23.561472, lng: -46.655881 }
-  },
-  { 
-    id: 'ord-102', 
-    status: 'PREPARING', 
-    customerName: 'Mariana Silva', 
-    address: 'Rua Augusta, 500 - SP', 
-    createdAt: new Date(Date.now() - 3600000).toISOString() 
-  },
-  { 
-    id: 'ord-103', 
-    status: 'ON_WAY', 
-    customerName: 'Ricardo Santos', 
-    address: 'Alameda Santos, 85 - SP', 
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
-    currentLocation: { lat: -23.571472, lng: -46.645881 }
-  },
-];
+export default function AdminDashboardPage() {
+  const { token } = useAuth();
+  const { t } = useConfig();
+  const { socket, isConnected } = useSocket(token);
 
-export default function AdminDashboard() {
-  const { t, language } = useConfig();
-  const [orders] = useState<Order[]>(MOCK_ORDERS);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const selectedOrder = useMemo(() => 
-    orders.find(o => o.id === selectedOrderId), 
-    [orders, selectedOrderId]
-  );
+  const adminT = t.admin;
+  const statusT = t.status;
 
-  const activeOrdersCount = orders.filter(o => o.status !== 'DELIVERED').length;
-  
-  const mapCenter: [number, number] = selectedOrder?.currentLocation 
-    ? [selectedOrder.currentLocation.lat, selectedOrder.currentLocation.lng] 
-    : [-23.561472, -46.655881]; // Default: São Paulo
+  useEffect(() => {
+    async function fetchInitialData() {
+      if (!token) return;
+      try {
+        const data = await getOrders(token);
+        setOrders(data);
+      } catch (error) {
+        console.error("Error cargando órdenes:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchInitialData();
+  }, [token]);
 
-  const markers = useMemo(() => 
-    orders
-      .filter(o => o.currentLocation)
-      .map(o => ({
-        id: o.id,
-        position: [o.currentLocation!.lat, o.currentLocation!.lng] as [number, number],
-        label: `${t.status[o.status]}: ${o.customerName}`
-      })),
-    [orders, t]
-  );
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('orderStatusChanged', (updatedOrder: any) => {
+      setOrders((prev) => prev.map((o) => o.id === updatedOrder.id ? { ...o, status: updatedOrder.status } : o));
+      setSelectedOrder((prev: any) => prev?.id === updatedOrder.id ? { ...prev, status: updatedOrder.status } : prev);
+    });
+
+    socket.on('newOrder', (newOrder: any) => {
+      setOrders((prev) => [newOrder, ...prev]);
+    });
+
+    return () => {
+      socket.off('orderStatusChanged');
+      socket.off('newOrder');
+    };
+  }, [socket]);
 
   return (
-    <main className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
-      {/* Sidebar */}
-      <div className="w-96 bg-white border-r border-slate-200 flex flex-col shadow-xl z-20">
-        <header className="p-6 border-b border-slate-100 bg-white sticky top-0">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-200">
-              📊
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800">{t.admin.title}</h1>
+    <div className="space-y-8 animate-in fade-in duration-700 p-4 lg:p-8">
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">{adminT.title}</h2>
+          <p className="text-slate-500 font-medium text-sm mt-1">{adminT.desc}</p>
+        </div>
+
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
+          }`}>
+          {isConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
+          {isConnected ? 'SISTEMA LIVE' : 'DESCONECTADO'}
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
+        {/* Lista de Órdenes */}
+        <section className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col h-[700px]">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+              <Package className="text-orange-500" size={20} />
+              {adminT.current_orders}
+            </h3>
+            <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg shadow-slate-200">
+              {orders.length} TOTAL
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50">
-              <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1">{t.admin.active}</p>
-              <p className="text-2xl font-black text-indigo-700">{activeOrdersCount}</p>
-            </div>
-            <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50">
-              <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider mb-1">{t.admin.today}</p>
-              <p className="text-2xl font-black text-emerald-700">24</p>
-            </div>
-          </div>
-        </header>
-        
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <section>
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-              {t.admin.current_orders}
-            </h2>
-            <div className="space-y-4">
-              {orders.map(order => (
-                <div 
+          <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3">
+                <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+                <span className="text-xs font-black uppercase tracking-[0.2em]">Sincronizando...</span>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Sin órdenes activas</p>
+              </div>
+            ) : (
+              orders.map((order: any) => (
+                <div
                   key={order.id}
-                  className={`transition-all duration-300 transform ${selectedOrderId === order.id ? 'scale-[1.02]' : ''}`}
+                  onClick={() => setSelectedOrder(order)}
+                  className={`p-5 border rounded-[1.8rem] transition-all cursor-pointer relative overflow-hidden group ${selectedOrder?.id === order.id
+                      ? 'bg-slate-900 border-slate-900 shadow-2xl shadow-slate-300 -translate-y-1'
+                      : 'border-slate-100 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-xl hover:shadow-slate-100'
+                    }`}
                 >
-                  <OrderCard 
-                    order={order} 
-                    onClick={(id) => setSelectedOrderId(id)}
-                  />
+                  <div className="flex justify-between items-start mb-4 relative z-10">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${selectedOrder?.id === order.id ? 'text-orange-500' : 'text-slate-400'}`}>
+                      #{order.id.split('-')[0]}
+                    </span>
+                    <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-[0.15em] shadow-sm ${selectedOrder?.id === order.id ? 'bg-orange-500 text-white' : 'bg-white text-slate-900 border border-slate-100'
+                      }`}>
+                      {statusT[order.status as keyof typeof statusT] || order.status}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${selectedOrder?.id === order.id ? 'bg-slate-800' : 'bg-white border border-slate-100 shadow-sm'}`}>
+                        <MapPin size={14} className={selectedOrder?.id === order.id ? 'text-orange-500' : 'text-slate-400'} />
+                      </div>
+                      <span className={`text-xs font-bold truncate ${selectedOrder?.id === order.id ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {order.addressFrom}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${selectedOrder?.id === order.id ? 'bg-orange-500' : 'bg-white border border-slate-100 shadow-sm'}`}>
+                        <Navigation size={14} className={selectedOrder?.id === order.id ? 'text-white' : 'text-orange-500'} />
+                      </div>
+                      <span className={`text-xs font-black truncate ${selectedOrder?.id === order.id ? 'text-white' : 'text-slate-900'}`}>
+                        {order.addressTo}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <footer className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <p className="text-[10px] text-center text-slate-400 font-medium">
-            Delivery Admin v1.0 • {new Date().toLocaleDateString(language)}
-          </p>
-        </footer>
-      </div>
-
-      {/* Map View */}
-      <div className="flex-1 relative bg-slate-100">
-        <DeliveryMap 
-          center={mapCenter}
-          zoom={14}
-          markers={markers}
-        />
-        
-        {/* Floating Order Info */}
-        {selectedOrder && (
-          <div className="absolute top-6 right-6 w-80 bg-white/90 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-white/20 z-[1000] animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Detalhes do Pedido</p>
-                <h3 className="font-bold text-slate-900 text-lg">#{selectedOrder.id.slice(-6)}</h3>
-              </div>
-              <button 
-                onClick={() => setSelectedOrderId(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors cursor-pointer"
-              >✕</button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm">👤</div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'pt' ? 'Cliente' : 'Cliente'}</p>
-                  <p className="text-sm font-semibold">{selectedOrder.customerName}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm">📍</div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'pt' ? 'Entrega' : 'Entrega'}</p>
-                  <p className="text-xs font-semibold leading-relaxed">{selectedOrder.address}</p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                <StatusBadge status={selectedOrder.status} />
-                <button className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer">
-                  {language === 'pt' ? 'Ver histórico' : 'Ver historial'}
-                </button>
-              </div>
-            </div>
+              ))
+            )}
           </div>
-        )}
+        </section>
 
-        {/* Search Map Floating UI */}
-        <div className="absolute bottom-6 right-6 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 z-[1000] text-[10px] font-bold text-slate-500 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          Sincronizado em tempo real
-        </div>
+        <section className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-100 h-[700px] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.02)] z-0">
+
+          {/* ELIMINAMOS EL DIV FLOTANTE CON LA CLASE "absolute top-6 left-6..." */}
+
+          <div className="absolute inset-0">
+            <MapWithNoSSR
+              orders={orders} // Pasamos todas las órdenes para no perderlas de vista
+              // Extraemos lat y lng directamente de la orden seleccionada
+              center={selectedOrder && selectedOrder.lat && selectedOrder.lng ? [selectedOrder.lat, selectedOrder.lng] : undefined}
+              zoom={selectedOrder ? 16 : 13}
+            />
+          </div>
+        </section>
       </div>
-    </main>
+    </div>
   );
 }

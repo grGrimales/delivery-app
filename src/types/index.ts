@@ -3,6 +3,7 @@ export type OrderStatus = 'PREPARING' | 'ON_WAY' | 'DELIVERED';
 export interface User {
   id: string;
   name: string;
+  email: string;
   role: 'ADMIN' | 'DRIVER' | 'CUSTOMER';
 }
 

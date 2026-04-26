@@ -1,113 +1,187 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useConfig } from '@/hooks/useConfig';
 import { useTracking } from '@/hooks/useTracking';
-import { Order, OrderStatus } from '@/types';
-import { StatusBadge } from '@/components/orders/StatusBadge';
-import ChatBox from '@/components/chat/ChatBox';
+import { 
+  Navigation, 
+  MessageSquare, 
+  CheckCircle2, 
+  MapPin, 
+  Phone, 
+  AlertTriangle,
+  ChevronUp
+} from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const DeliveryMap = dynamic(() => import('@/components/map/DeliveryMap'), { ssr: false });
 
 export default function DriverApp() {
-  const [activeOrder, setActiveOrder] = useState<Order | null>({
-    id: '1',
-    status: 'PREPARING',
-    customerName: 'Juan Pérez',
-    address: 'Calle Mayor 1',
-    createdAt: new Date().toISOString()
+  const { user } = useAuth();
+  const { t, language } = useConfig();
+  const [currentOrder, setCurrentOrder] = useState<any>({
+    id: 'ORD-772',
+    customer: 'Leticia Silva',
+    address: 'Rua das Flores, 123, Lisboa',
+    status: 'PICKUP', // PICKUP, ON_WAY, DELIVERED
+    phone: '+351 912 345 678'
   });
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const { updateLocation, isConnected } = useTracking(activeOrder?.id);
-  const [messages, setMessages] = useState([]);
+  // Hook de tracking real
+  const { updateLocation } = useTracking(currentOrder.id);
 
-  // Mock Geolocation update
+  // Simulación de actualización de GPS cada 10s
   useEffect(() => {
-    if (!activeOrder || activeOrder.status !== 'ON_WAY') return;
-
     const interval = setInterval(() => {
-      // Simulate moving a bit
-      const lat = 40.416775 + (Math.random() - 0.5) * 0.01;
-      const lng = -3.703790 + (Math.random() - 0.5) * 0.01;
-      updateLocation({ lat, lng });
-      console.log('Driver: Location updated', { lat, lng });
-    }, 5000);
-
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          updateLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            heading: pos.coords.heading || 0
+          });
+        });
+      }
+    }, 10000);
     return () => clearInterval(interval);
-  }, [activeOrder?.status, updateLocation]);
+  }, [currentOrder.id]);
 
-  const handleStatusChange = (newStatus: OrderStatus) => {
-    if (activeOrder) {
-      setActiveOrder({ ...activeOrder, status: newStatus });
-      // In a real app, you would call an API here
-    }
+  const handleStatusChange = () => {
+    if (currentOrder.status === 'PICKUP') setCurrentOrder({...currentOrder, status: 'ON_WAY'});
+    else if (currentOrder.status === 'ON_WAY') setCurrentOrder({...currentOrder, status: 'DELIVERED'});
   };
 
-  if (!activeOrder) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">No tienes pedidos activos.</p>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 pb-24">
-      <div className="max-w-md mx-auto space-y-4">
-        <header className="flex justify-between items-center">
-          <h1 className="text-xl font-bold">App Repartidor</h1>
-          <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-        </header>
+    <div className="h-screen bg-slate-900 flex flex-col font-sans overflow-hidden text-white">
+      
+      {/* Header de Estado */}
+      <header className="p-5 flex justify-between items-center bg-slate-900/50 backdrop-blur-md border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="h-3 w-3 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+          <span className="text-xs font-black uppercase tracking-widest text-emerald-400">Online • Live GPS</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Earnings Today:</span>
+          <span className="text-sm font-black text-orange-500">€84.50</span>
+        </div>
+      </header>
 
-        <section className="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-semibold">Pedido Actual</p>
-              <h2 className="text-lg font-bold">#{activeOrder.id.slice(0, 8)}</h2>
-            </div>
-            <StatusBadge status={activeOrder.status} />
-          </div>
-
-          <div className="space-y-2 border-t pt-4">
-            <p className="text-sm">
-              <span className="text-gray-500">Cliente:</span><br />
-              <span className="font-semibold">{activeOrder.customerName}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-gray-500">Dirección:</span><br />
-              <span className="font-semibold">{activeOrder.address}</span>
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            {activeOrder.status === 'PREPARING' && (
-              <button 
-                onClick={() => handleStatusChange('ON_WAY')}
-                className="col-span-2 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors"
-              >
-                Recoger Pedido
-              </button>
-            )}
-            {activeOrder.status === 'ON_WAY' && (
-              <button 
-                onClick={() => handleStatusChange('DELIVERED')}
-                className="col-span-2 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
-              >
-                Marcar como Entregado
-              </button>
-            )}
-          </div>
-        </section>
-
-        <section>
-          <ChatBox 
-            orderId={activeOrder.id}
-            messages={messages}
-            onSendMessage={(text) => {
-              // Mock sending message
-              console.log('Sending message:', text);
-            }}
-            currentUser={{ id: 'driver-1' }}
-          />
-        </section>
+      {/* Mapa de Navegación (Fondo) */}
+      <div className="flex-1 relative">
+        <DeliveryMap 
+          center={[38.7223, -9.1393]} 
+          zoom={16}
+          markers={[{ id: 'me', position: [38.7223, -9.1393], label: 'Eu' }]}
+        />
+        
+        {/* Overlay de Alerta / Incidencia */}
+        <button className="absolute top-4 right-4 h-12 w-12 bg-red-500 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 active:scale-90 transition-all">
+          <AlertTriangle className="text-white" size={24} />
+        </button>
       </div>
-    </main>
+
+      {/* Panel de Pedido Flotante (UI Móvil) */}
+      <div className="bg-white rounded-t-[3rem] p-8 pb-10 shadow-[0_-20px_50px_rgba(0,0,0,0.2)] text-slate-900 shrink-0">
+        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+        
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-black bg-orange-100 text-orange-600 px-2 py-0.5 rounded-md uppercase">Current Order</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase">#{currentOrder.id}</span>
+            </div>
+            <h2 className="text-2xl font-black tracking-tight">{currentOrder.customer}</h2>
+          </div>
+          <button className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-orange-500 transition-colors">
+            <Phone size={20} />
+          </button>
+        </div>
+
+        <div className="flex items-start gap-4 mb-8 bg-slate-50 p-5 rounded-3xl">
+          <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-orange-500 shadow-sm shrink-0">
+            <MapPin size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Delivery Address</p>
+            <p className="text-sm font-bold text-slate-700 leading-snug">{currentOrder.address}</p>
+          </div>
+        </div>
+
+        {/* Botones de Acción */}
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsChatOpen(true)}
+            className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 active:scale-95 transition-all relative"
+          >
+            <MessageSquare size={24} />
+            <span className="absolute top-4 right-4 h-3 w-3 bg-orange-500 rounded-full border-2 border-white" />
+          </button>
+          
+          <button 
+            onClick={handleStatusChange}
+            disabled={currentOrder.status === 'DELIVERED'}
+            className={`flex-1 h-16 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-xl ${
+              currentOrder.status === 'DELIVERED' 
+              ? 'bg-emerald-500 text-white shadow-emerald-200' 
+              : 'bg-slate-900 text-white shadow-slate-200'
+            }`}
+          >
+            {currentOrder.status === 'PICKUP' && (
+              <>
+                <Navigation size={18} className="text-orange-500" />
+                {language === 'es' ? 'Recoger Pedido' : 'Recolher Pedido'}
+              </>
+            )}
+            {currentOrder.status === 'ON_WAY' && (
+              <>
+                <CheckCircle2 size={18} className="text-emerald-500" />
+                {language === 'es' ? 'Marcar como Entregado' : 'Entregue'}
+              </>
+            )}
+            {currentOrder.status === 'DELIVERED' && 'Completado'}
+          </button>
+        </div>
+      </div>
+
+      {/* Chat Modal RT */}
+      {isChatOpen && (
+        <div className="fixed inset-0 z-50 bg-white animate-in slide-in-from-bottom duration-300 flex flex-col">
+          <header className="p-6 border-b flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setIsChatOpen(false)} className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                <ChevronUp className="rotate-180" size={20} />
+              </button>
+              <div>
+                <p className="text-sm font-black">{currentOrder.customer}</p>
+                <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Online Now</p>
+              </div>
+            </div>
+          </header>
+          <div className="flex-1 bg-slate-50 p-6 overflow-y-auto space-y-4">
+            {/* Mensajes simulados */}
+            <div className="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[80%] text-sm font-medium text-slate-700 border border-slate-100">
+              Olá! Onde você está exatamente?
+            </div>
+            <div className="bg-slate-900 p-4 rounded-2xl rounded-tr-none shadow-lg max-w-[80%] ml-auto text-sm font-bold text-white">
+              Estou a 2 minutos, já estou na sua rua! 🛵
+            </div>
+          </div>
+          <div className="p-6 border-t bg-white flex gap-3">
+            <input 
+              type="text" 
+              placeholder="Escribe un mensaje..." 
+              className="flex-1 bg-slate-100 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-orange-500/20"
+            />
+            <button className="h-14 w-14 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
+              <Navigation className="rotate-90" size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
