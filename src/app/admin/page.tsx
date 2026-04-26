@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/hooks/useAuth';
 import { useConfig } from '@/hooks/useConfig';
 import { useSocket } from '@/hooks/useSocket';
 import { MapPin, Navigation, Package, Loader2, Wifi, WifiOff, X } from 'lucide-react';
-import { getOrders } from '@/lib/orders';
+import { assignDriver, createOrder, getOrders } from '@/lib/orders';
+import OrderModal from '@/components/admin/OrderModal';
 
 const MapWithNoSSR = dynamic(
   () => import('@/components/map/DeliveryMap'),
@@ -23,7 +24,7 @@ const MapWithNoSSR = dynamic(
 
 export default function AdminDashboardPage() {
   const { token } = useAuth();
-  const { t } = useConfig();
+  const { t, language } = useConfig();
   const { socket, isConnected } = useSocket(token);
 
   const [orders, setOrders] = useState<any[]>([]);
@@ -32,6 +33,25 @@ export default function AdminDashboardPage() {
 
   const adminT = t.admin;
   const statusT = t.status;
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleCreateOrder = async (orderData: any) => {
+    try {
+      const newOrder = await createOrder(orderData, token!);
+      setOrders([newOrder, ...orders]);
+    } catch (err) {
+      console.error("Error al crear orden");
+    }
+  };
+
+  const handleAssign = async (orderId: string, driverId: string) => {
+    try {
+      await assignDriver(orderId, driverId, token!);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'preparing' } : o));
+    } catch (err) {
+      console.error("Error al asignar");
+    }
+  };
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -70,10 +90,18 @@ export default function AdminDashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-700 p-4 lg:p-8">
       <header className="flex items-center justify-between">
         <div>
+
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">{adminT.title}</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">{adminT.desc}</p>
         </div>
 
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-orange-600 transition-all flex items-center gap-2"
+        >
+          <Package size={18} />
+          {language === 'es' ? 'Nueva Orden' : 'New Order'}
+        </button>
         <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
           }`}>
           {isConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
@@ -110,8 +138,8 @@ export default function AdminDashboardPage() {
                   key={order.id}
                   onClick={() => setSelectedOrder(order)}
                   className={`p-5 border rounded-[1.8rem] transition-all cursor-pointer relative overflow-hidden group ${selectedOrder?.id === order.id
-                      ? 'bg-slate-900 border-slate-900 shadow-2xl shadow-slate-300 -translate-y-1'
-                      : 'border-slate-100 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-xl hover:shadow-slate-100'
+                    ? 'bg-slate-900 border-slate-900 shadow-2xl shadow-slate-300 -translate-y-1'
+                    : 'border-slate-100 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-xl hover:shadow-slate-100'
                     }`}
                 >
                   <div className="flex justify-between items-start mb-4 relative z-10">
@@ -150,18 +178,22 @@ export default function AdminDashboardPage() {
 
         <section className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-100 h-[700px] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.02)] z-0">
 
-          {/* ELIMINAMOS EL DIV FLOTANTE CON LA CLASE "absolute top-6 left-6..." */}
 
           <div className="absolute inset-0">
             <MapWithNoSSR
-              orders={orders} // Pasamos todas las órdenes para no perderlas de vista
-              // Extraemos lat y lng directamente de la orden seleccionada
+              orders={orders}
               center={selectedOrder && selectedOrder.lat && selectedOrder.lng ? [selectedOrder.lat, selectedOrder.lng] : undefined}
               zoom={selectedOrder ? 16 : 13}
             />
           </div>
         </section>
       </div>
+      <OrderModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateOrder}
+      />
     </div>
+
   );
 }
