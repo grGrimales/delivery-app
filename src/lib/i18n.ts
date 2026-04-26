@@ -32,6 +32,20 @@ export const translations = {
     home: {
       welcome: "Bem-vindo ao Delivery App",
       subtitle: "Escolha o módulo que deseja acessar para começar a gerenciar seus pedidos em tempo real."
+    },
+    auth: {
+      login_title: "Entrar",
+      login_subtitle: "Delivery App Professional",
+      register_title: "Criar conta",
+      register_subtitle: "Crie sua conta profissional",
+      email: "Email",
+      password: "Senha",
+      name: "Nome",
+      role: "Função",
+      submit_login: "Entrar",
+      submit_register: "Cadastrar",
+      no_account: "Não tem uma conta? Cadastre-se",
+      have_account: "Já tem uma conta? Entre aqui",
     }
   },
   es: {
@@ -67,6 +81,20 @@ export const translations = {
     home: {
       welcome: "Bienvenido al Delivery App",
       subtitle: "Elige el módulo al que deseas acceder para comenzar a gestionar tus pedidos en tiempo real."
+    },
+    auth: {
+      login_title: "Iniciar Sesión",
+      login_subtitle: "Delivery App Professional",
+      register_title: "Crear cuenta",
+      register_subtitle: "Crea tu cuenta profesional",
+      email: "Email",
+      password: "Contraseña",
+      name: "Nombre",
+      role: "Rol",
+      submit_login: "Entrar",
+      submit_register: "Registrarse",
+      no_account: "¿No tienes cuenta? Regístrate",
+      have_account: "¿Ya tienes cuenta? Entra aquí",
     }
   },
   en: {
@@ -102,6 +130,20 @@ export const translations = {
     home: {
       welcome: "Welcome to Delivery App",
       subtitle: "Choose the module you want to access to start managing your orders in real time."
+    },
+    auth: {
+      login_title: "Login",
+      login_subtitle: "Delivery App Professional",
+      register_title: "Create account",
+      register_subtitle: "Create your professional account",
+      email: "Email",
+      password: "Password",
+      name: "Name",
+      role: "Role",
+      submit_login: "Login",
+      submit_register: "Register",
+      no_account: "Don't have an account? Register",
+      have_account: "Already have an account? Login",
     }
   }
 };
