@@ -1,0 +1,51 @@
+{
+  "admin": {
+    "title": "Painel de Controle",
+    "active": "Ativos",
+    "today": "Hoje",
+    "current_orders": "Pedidos em curso",
+    "loading_map": "Carregando mapa...",
+    "desc": "Gestão completa de pedidos e estafetas em tempo real."
+  },
+  "driver": {
+    "title": "App Entregador",
+    "current_order": "Pedido Atual",
+    "pickup": "Coletar Pedido",
+    "delivered": "Marcar como Entregue",
+    "no_orders": "Você não tem pedidos ativos.",
+    "desc": "Interface dedicada para o estafeta com GPS e chat."
+  },
+  "track": {
+    "title": "Rastreio Público",
+    "desc": "Vista exclusiva para o cliente acompanhar a entrega."
+  },
+  "status": {
+    "PREPARING": "Preparando",
+    "ON_WAY": "A caminho",
+    "DELIVERED": "Entregue"
+  },
+  "chat": {
+    "placeholder": "Escreva uma mensagem...",
+    "send": "Enviar"
+  },
+  "home": {
+    "welcome": "Bem-vindo ao Delivery App",
+    "subtitle": "Escolha o módulo que deseja acessar."
+  },
+  "auth": {
+    "login_title": "Entrar",
+    "login_subtitle": "Delivery App Professional",
+    "register_title": "Criar conta",
+    "register_subtitle": "Crie sua conta profissional",
+    "email": "Email",
+    "password": "Senha",
+    "name": "Nome",
+    "role": "Função",
+    "submit_login": "Entrar",
+    "submit_register": "Cadastrar",
+    "no_account": "Não tem uma conta?",
+    "have_account": "Já tem uma conta?",
+    "register_link": "Cadastre-se",
+    "login_link": "Entre aqui"
+  }
+}

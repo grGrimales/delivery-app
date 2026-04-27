@@ -1,0 +1,51 @@
+{
+  "admin": {
+    "title": "Panel de Control",
+    "active": "Activos",
+    "today": "Hoy",
+    "current_orders": "Pedidos en curso",
+    "loading_map": "Cargando mapa...",
+    "desc": "Gestión completa de pedidos y repartidores en tiempo real."
+  },
+  "driver": {
+    "title": "App Repartidor",
+    "current_order": "Pedido Actual",
+    "pickup": "Recoger Pedido",
+    "delivered": "Marcar como Entregado",
+    "no_orders": "No tienes pedidos activos.",
+    "desc": "Interfaz dedicada para el repartidor con GPS y chat."
+  },
+  "track": {
+    "title": "Rastreo Público",
+    "desc": "Vista exclusiva para el cliente seguir la entrega."
+  },
+  "status": {
+    "PREPARING": "Preparando",
+    "ON_WAY": "En camino",
+    "DELIVERED": "Entregado"
+  },
+  "chat": {
+    "placeholder": "Escribe un mensaje...",
+    "send": "Enviar"
+  },
+  "home": {
+    "welcome": "Bienvenido al Delivery App",
+    "subtitle": "Elige el módulo al que deseas acceder."
+  },
+  "auth": {
+    "login_title": "Iniciar Sesión",
+    "login_subtitle": "Delivery App Professional",
+    "register_title": "Crear cuenta",
+    "register_subtitle": "Crea tu cuenta profesional",
+    "email": "Email",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "role": "Rol",
+    "submit_login": "Entrar",
+    "submit_register": "Registrarse",
+    "no_account": "¿No tienes cuenta?",
+    "have_account": "¿Ya tienes cuenta?",
+    "register_link": "Regístrate",
+    "login_link": "Entra aquí"
+  }
+}

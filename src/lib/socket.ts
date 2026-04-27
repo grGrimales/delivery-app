@@ -1,7 +1,44 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL!;
 
-export const socket: Socket = io(SOCKET_URL, {
-  autoConnect: false,
-});
+// Instancias separadas por namespace
+let trackingSocket: Socket | null = null;
+let chatSocket: Socket | null = null;
+
+function getToken() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+}
+
+export function getTrackingSocket(): Socket {
+  if (!trackingSocket) {
+    trackingSocket = io(`${WS_URL}/tracking`, {
+      auth: { token: getToken() },
+      autoConnect: false,
+    });
+  }
+  return trackingSocket;
+}
+
+export function getChatSocket(): Socket {
+  if (!chatSocket) {
+    chatSocket = io(`${WS_URL}/chat`, {
+      auth: { token: getToken() },
+      autoConnect: false,
+    });
+  }
+  return chatSocket;
+}
+
+export function connectSockets() {
+  getTrackingSocket().connect();
+  getChatSocket().connect();
+}
+
+export function disconnectSockets() {
+  trackingSocket?.disconnect();
+  chatSocket?.disconnect();
+  trackingSocket = null;
+  chatSocket = null;
+}

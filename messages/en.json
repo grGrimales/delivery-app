@@ -1,0 +1,51 @@
+{
+  "admin": {
+    "title": "Admin Dashboard",
+    "active": "Active",
+    "today": "Today",
+    "current_orders": "Ongoing Orders",
+    "loading_map": "Loading map...",
+    "desc": "Complete real-time order and driver management."
+  },
+  "driver": {
+    "title": "Driver App",
+    "current_order": "Current Order",
+    "pickup": "Pick up Order",
+    "delivered": "Mark as Delivered",
+    "no_orders": "No active orders found.",
+    "desc": "Dedicated driver interface with GPS and chat."
+  },
+  "track": {
+    "title": "Public Tracking",
+    "desc": "Exclusive view for customers to track their delivery."
+  },
+  "status": {
+    "PREPARING": "Preparing",
+    "ON_WAY": "On the way",
+    "DELIVERED": "Delivered"
+  },
+  "chat": {
+    "placeholder": "Type a message...",
+    "send": "Send"
+  },
+  "home": {
+    "welcome": "Welcome to Delivery App",
+    "subtitle": "Choose the module you want to access."
+  },
+  "auth": {
+    "login_title": "Login",
+    "login_subtitle": "Delivery App Professional",
+    "register_title": "Create account",
+    "register_subtitle": "Create your professional account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "role": "Role",
+    "submit_login": "Login",
+    "submit_register": "Register",
+    "no_account": "Don't have an account?",
+    "have_account": "Already have an account?",
+    "register_link": "Register",
+    "login_link": "Login"
+  }
+}
