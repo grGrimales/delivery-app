@@ -27,7 +27,6 @@ export default function DriverPage() {
   const { position, isConnected, emitStatus, startGPS } = useTracking(order?.id ?? '');
   const { messages, sendMessage } = useChat(order?.id ?? '');
 
-  // Cargar pedido activo del repartidor
   useEffect(() => {
     apiFetch<Order[]>('/orders/driver/my-orders')
       .then(orders => {
@@ -39,7 +38,6 @@ export default function DriverPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Arrancar GPS cuando hay pedido activo
   useEffect(() => {
     if (!order) return;
     const stopGPS = startGPS();
@@ -51,7 +49,6 @@ export default function DriverPage() {
     emitStatus(status);
     setOrder(prev => prev ? { ...prev, status } : null);
 
-    // También actualizar en la DB via REST
     await apiFetch(`/orders/${order.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
@@ -92,7 +89,6 @@ export default function DriverPage() {
       <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
 
         {!order ? (
-          // Sin pedido activo
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-16 h-16 bg-surface-800 rounded-2xl flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
