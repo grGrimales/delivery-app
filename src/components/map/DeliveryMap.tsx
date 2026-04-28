@@ -1,95 +1,113 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-interface DeliveryMapProps {
-  orders: any[];
-  center?: { lat: number, lng: number } | [number, number];
-  zoom?: number;
-}
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
-// Componente para manejar el cambio de vista del mapa
-function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+const driverIcon = L.divIcon({
+  html: `
+    <div style="
+      width: 40px; height: 40px;
+      background: #F97316;
+      border: 3px solid white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    ">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  `,
+  className: '',
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+});
+
+const destinationIcon = L.divIcon({
+  html: `
+    <div style="
+      width: 32px; height: 32px;
+      background: #1F2937;
+      border: 3px solid white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    ">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white"/>
+      </svg>
+    </div>
+  `,
+  className: '',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+});
+
+function MapUpdater({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, zoom, { animate: true, duration: 1 });
-  }, [center, zoom, map]);
+    map.setView([lat, lng], map.getZoom(), { animate: true });
+  }, [lat, lng, map]);
   return null;
 }
 
-export default function DeliveryMap({ orders, center, zoom = 13 }: DeliveryMapProps) {
-  // Centro por defecto: Florianópolis, SC, Brasil
-  const defaultPos: [number, number] = [-27.5945, -48.5658];
-  const [markerIcon, setMarkerIcon] = useState<L.DivIcon | null>(null);
+type Props = {
+  driverPosition?: { lat: number; lng: number } | null;
+  destination?: { lat: number; lng: number; address: string } | null;
+  height?: string;
+};
 
-  useEffect(() => {
-    // Definimos el icono solo en el cliente
-    const icon = L.divIcon({
-      className: 'bg-transparent',
-      html: `<div style="background-color: #f97316; color: white; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 3px solid white; box-shadow: 0 10px 15px rgba(0,0,0,0.1); transform: rotate(-45deg);"><div style="transform: rotate(45deg);">📦</div></div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-    });
-    setMarkerIcon(icon);
-  }, []);
-
-  // Normalizamos el centro validando que existan las coordenadas
-  let mapCenter: [number, number] = defaultPos;
-  if (center) {
-    if (Array.isArray(center) && center.length === 2) {
-      mapCenter = center as [number, number];
-    } else if (!Array.isArray(center) && center.lat && center.lng) {
-      mapCenter = [center.lat, center.lng];
-    }
-  }
-
-  if (!markerIcon) return null;
+export default function DeliveryMap({
+  driverPosition,
+  destination,
+  height = '400px',
+}: Props) {
+  const initialPos = driverPosition ?? destination ?? { lat: -27.5954, lng: -48.548 };
 
   return (
-    <MapContainer
-      center={mapCenter}
-      zoom={zoom}
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={false}
-    >
-      <ChangeView center={mapCenter} zoom={zoom} />
+    <div style={{ height, width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+      <MapContainer
+        center={[initialPos.lat, initialPos.lng]}
+        zoom={14}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        attribution='&copy; CARTO'
-      />
+        {driverPosition && (
+          <>
+            <Marker
+              position={[driverPosition.lat, driverPosition.lng]}
+              icon={driverIcon}
+            >
+              <Popup>Repartidor</Popup>
+            </Marker>
+            <MapUpdater lat={driverPosition.lat} lng={driverPosition.lng} />
+          </>
+        )}
 
-      {orders.map((order) => {
-        // Obtenemos lat y lng directamente (ajustado según tu DB de TypeORM)
-        const lat = order.lat;
-        const lng = order.lng;
-
-        if (!lat || !lng) return null;
-
-        return (
+        {/* Marcador del destino */}
+        {destination && (
           <Marker
-            key={order.id}
-            position={[lat, lng]}
-            icon={markerIcon}
+            position={[destination.lat, destination.lng]}
+            icon={destinationIcon}
           >
-            <Popup className="custom-popup">
-              <div className="font-sans p-2 min-w-[150px]">
-                <p className="font-black text-slate-900 text-[10px] uppercase tracking-widest mb-1">Orden #{order.id.split('-')[0]}</p>
-                <p className="text-xs font-bold text-slate-600 mb-2 border-l-2 border-orange-500 pl-2">{order.addressTo}</p>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Estado:</span>
-                  <span className="bg-orange-50 text-orange-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase">
-                    {order.status}
-                  </span>
-                </div>
-              </div>
-            </Popup>
+            <Popup>{destination.address}</Popup>
           </Marker>
-        );
-      })}
-    </MapContainer>
+        )}
+      </MapContainer>
+    </div>
   );
 }
