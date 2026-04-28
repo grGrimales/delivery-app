@@ -1,279 +1,238 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { useAuth } from '@/hooks/useAuth';
-import { useConfig } from '@/hooks/useConfig';
-import { useSocket } from '@/hooks/useSocket';
-import { MapPin, Navigation, Package, Loader2, Wifi, WifiOff, X } from 'lucide-react';
-import { assignDriver, createOrder, getOrders } from '@/lib/orders';
-import OrderModal from '@/components/admin/OrderModal';
-import { getAvailableDrivers } from '@/lib/users';
+import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
+import { getTrackingSocket } from '@/lib/socket';
+import DynamicMap from '@/components/map/DynamicMap';
 
-const MapWithNoSSR = dynamic(
-  () => import('@/components/map/DeliveryMap'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex flex-col items-center justify-center h-full w-full bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-2" />
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-          Iniciando Mapa...
-        </span>
-      </div>
-    )
-  }
-);
+type Order = {
+  id: string;
+  addressFrom: string;
+  addressTo: string;
+  status: string;
+  customer: { id: string; name: string };
+  driver?: { id: string; name: string };
+  createdAt: string;
+};
 
-export default function AdminDashboardPage() {
-  const { token } = useAuth();
-  const { t, language } = useConfig();
-  const { socket, isConnected } = useSocket(token);
+type DriverPosition = {
+  orderId: string;
+  lat: number;
+  lng: number;
+};
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [drivers, setDrivers] = useState<any[]>([]);
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-500 bg-opacity-10 text-yellow-400',
+  preparing: 'bg-brand-500 bg-opacity-10 text-brand-400',
+  on_the_way: 'bg-blue-500 bg-opacity-10 text-blue-400',
+  delivered: 'bg-green-500 bg-opacity-10 text-green-400',
+};
 
-  const adminT = t.admin;
-  const statusT = t.status;
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendiente',
+  preparing: 'Preparando',
+  on_the_way: 'En camino',
+  delivered: 'Entregado',
+};
 
-  const handleCreateOrder = async (orderData: any) => {
-    try {
-      const newOrder = await createOrder(orderData, token!);
-      setOrders([newOrder, ...orders]);
-    } catch (err) {
-      console.error("Error al crear orden");
-    }
-  };
+export default function AdminPage() {
+  const t = useTranslations('admin');
+  const { user, logout } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [positions, setPositions] = useState<Record<string, DriverPosition>>({});
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('all');
 
-  const handleAssign = async (orderId: string, driverId: string) => {
-    try {
-      await assignDriver(orderId, driverId, token!);
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'PREPARING' } : o));
-      setSelectedOrder(null); // Cerramos el detalle al asignar
-    } catch (err) {
-      console.error("Error al asignar");
-    }
-  };
-
-  // Carga inicial de órdenes
   useEffect(() => {
-    async function fetchInitialData() {
-      if (!token) return;
-      try {
-        const data = await getOrders(token);
-        setOrders(data);
-      } catch (error) {
-        console.error("Error cargando órdenes:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchInitialData();
-  }, [token]);
+    apiFetch<Order[]>('/orders')
+      .then(setOrders)
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Sockets
   useEffect(() => {
-    if (!socket) return;
+    if (orders.length === 0) return;
+    const socket = getTrackingSocket();
+    socket.connect();
 
-    socket.on('orderStatusChanged', (updatedOrder: any) => {
-      setOrders((prev) => prev.map((o) => o.id === updatedOrder.id ? { ...o, status: updatedOrder.status } : o));
-      setSelectedOrder((prev: any) => prev?.id === updatedOrder.id ? { ...prev, status: updatedOrder.status } : prev);
+    const activeOrders = orders.filter(o => o.status !== 'delivered');
+    activeOrders.forEach(o => socket.emit('join:order', o.id));
+
+    socket.on('location:update', (data: DriverPosition) => {
+      setPositions(prev => ({ ...prev, [data.orderId]: data }));
     });
 
-    socket.on('newOrder', (newOrder: any) => {
-      setOrders((prev) => [newOrder, ...prev]);
+    socket.on('order:status:update', (data: { orderId: string; status: string }) => {
+      setOrders(prev =>
+        prev.map(o => o.id === data.orderId ? { ...o, status: data.status } : o)
+      );
     });
 
     return () => {
-      socket.off('orderStatusChanged');
-      socket.off('newOrder');
+      activeOrders.forEach(o => socket.emit('leave:order', o.id));
+      socket.off('location:update');
+      socket.off('order:status:update');
     };
-  }, [socket]);
+  }, [orders.length]);
 
-  useEffect(() => {
-    async function loadDrivers() {
-      if (!token) return;
-      try {
-        const data = await getAvailableDrivers(token);
-        setDrivers(data);
-      } catch (error) {
-        console.error("Error cargando repartidores:", error);
-      }
-    }
-    loadDrivers();
-  }, [token]);
+  const filteredOrders = filter === 'all'
+    ? orders
+    : orders.filter(o => o.status === filter);
+
+  const metrics = {
+    total: orders.length,
+    active: orders.filter(o => o.status === 'on_the_way').length,
+    today: orders.filter(o => {
+      const d = new Date(o.createdAt);
+      const now = new Date();
+      return d.toDateString() === now.toDateString();
+    }).length,
+    delivered: orders.filter(o => o.status === 'delivered').length,
+  };
+
+  // Marcadores del mapa — solo repartidores activos
+  const driverMarkers = Object.values(positions);
+
+  if (loading) return <LoadingScreen />;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 p-4 lg:p-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">{adminT.title}</h2>
-          <p className="text-slate-500 font-medium text-sm mt-1">{adminT.desc}</p>
-        </div>
+    <div className="min-h-screen bg-surface-900 text-white">
 
-        <div className="flex gap-4">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-orange-600 transition-all flex items-center gap-2"
-          >
-            <Package size={18} />
-            {language === 'es' ? 'Nueva Orden' : language === 'pt' ? 'Novo Pedido' : 'New Order'}
-          </button>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${isConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-            {isConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
-            {isConnected ? 'SISTEMA LIVE' : 'DESCONECTADO'}
+      {/* Header */}
+      <div className="bg-surface-800 border-b border-white border-opacity-5 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M12 12l9-5M12 12v10M12 12L3 7" stroke="white" strokeWidth="1.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-sm">DeliveryDash</p>
+              <p className="text-xs text-white opacity-30">{t('title')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-white opacity-40">{user?.name}</p>
+            <button
+              onClick={logout}
+              className="text-xs text-white opacity-30 hover:opacity-60 transition-opacity"
+            >
+              Salir
+            </button>
           </div>
         </div>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-        {/* Panel Lateral: Lista de Órdenes o Detalle de Asignación */}
-        <section className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col h-[700px]">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
-              <Package className="text-orange-500" size={20} />
-              {adminT.current_orders}
-            </h3>
-            <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg shadow-slate-200">
-              {orders.length} {adminT.active.toUpperCase()}
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3">
-                <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-              </div>
-            ) : selectedOrder ? (
-              <div className="bg-slate-900 text-white p-6 rounded-[2rem] h-full flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="flex justify-between items-center mb-6">
-                  <h4 className="font-black text-sm uppercase tracking-widest text-orange-500">
-                    Pedido #{selectedOrder.id.split('-')[0]}
-                  </h4>
-                  <button
-                    onClick={() => setSelectedOrder(null)}
-                    className="p-2 hover:bg-slate-800 rounded-full transition-colors"
-                  >
-                    <X size={18} className="text-slate-400 hover:text-white" />
-                  </button>
-                </div>
-
-                <div className="mb-6 space-y-3 flex-shrink-0">
-                  <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Origen:</p>
-                    <p className="text-xs font-medium text-slate-300 truncate">{selectedOrder.addressFrom}</p>
-                  </div>
-                  <div className="bg-slate-800/50 p-4 rounded-xl border border-orange-500/20">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Destino Final:</p>
-                    <p className="text-sm font-bold text-white truncate">{selectedOrder.addressTo}</p>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-                    Repartidores Disponibles
-                  </p>
-
-                  <div className="space-y-2">
-                    {drivers.length === 0 ? (
-                      <div className="text-center py-10 bg-slate-800/30 rounded-2xl border border-dashed border-slate-700">
-                        <p className="text-xs text-slate-500 italic">No hay repartidores en línea...</p>
-                      </div>
-                    ) : (
-                      drivers.map(driver => (
-                        <button
-                          key={driver.id}
-                          onClick={() => handleAssign(selectedOrder.id, driver.id)}
-                          className="w-full flex items-center justify-between p-4 bg-slate-800 border border-slate-700 hover:bg-orange-600 hover:border-orange-500 rounded-2xl transition-all group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 bg-slate-700 text-slate-300 rounded-full flex items-center justify-center font-bold text-xs uppercase group-hover:bg-white/20 group-hover:text-white transition-colors">
-                              {driver.name.substring(0, 2)}
-                            </div>
-                            <span className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">
-                              {driver.name}
-                            </span>
-                          </div>
-                          <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-md group-hover:bg-white group-hover:text-orange-600 group-hover:border-transparent transition-all">
-                            ASIGNAR
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : orders.length === 0 ? (
-              <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Sin órdenes activas</p>
-              </div>
-            ) : (
-              // LISTA NORMAL DE ÓRDENES
-              orders.map((order: any) => (
-                <div
-                  key={order.id}
-                  onClick={() => setSelectedOrder(order)}
-                  className={`p-5 border rounded-[1.8rem] transition-all cursor-pointer relative overflow-hidden group ${selectedOrder?.id === order.id
-                    ? 'bg-slate-900 border-slate-900 shadow-2xl shadow-slate-300 -translate-y-1'
-                    : 'border-slate-100 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-xl hover:shadow-slate-100'
-                    }`}
-                >
-                  <div className="flex justify-between items-start mb-4 relative z-10">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${selectedOrder?.id === order.id ? 'text-orange-500' : 'text-slate-400'}`}>
-                      #{order.id.split('-')[0]}
-                    </span>
-                    <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-[0.15em] shadow-sm ${selectedOrder?.id === order.id ? 'bg-orange-500 text-white' : 'bg-white text-slate-900 border border-slate-100'
-                      }`}>
-                      {statusT[order.status.toUpperCase() as keyof typeof statusT] || order.status}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 relative z-10">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${selectedOrder?.id === order.id ? 'bg-slate-800' : 'bg-white border border-slate-100 shadow-sm'}`}>
-                        <MapPin size={14} className={selectedOrder?.id === order.id ? 'text-orange-500' : 'text-slate-400'} />
-                      </div>
-                      <span className={`text-xs font-bold truncate ${selectedOrder?.id === order.id ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {order.addressFrom}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors ${selectedOrder?.id === order.id ? 'bg-orange-500' : 'bg-white border border-slate-100 shadow-sm'}`}>
-                        <Navigation size={14} className={selectedOrder?.id === order.id ? 'text-white' : 'text-orange-500'} />
-                      </div>
-                      <span className={`text-xs font-black truncate ${selectedOrder?.id === order.id ? 'text-white' : 'text-slate-900'}`}>
-                        {order.addressTo}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* MAPA */}
-        <section className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-100 h-[700px] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.02)] z-0">
-          <div className="absolute inset-0">
-            <MapWithNoSSR
-              orders={orders}
-              center={selectedOrder && selectedOrder.lat && selectedOrder.lng ? [selectedOrder.lat, selectedOrder.lng] : undefined}
-              zoom={selectedOrder ? 16 : 13}
-            />
-          </div>
-        </section>
       </div>
 
-      {/* MODAL */}
-      <OrderModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateOrder}
-      />
+      <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
+
+        {/* Métricas */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'Total pedidos', value: metrics.total },
+            { label: t('active'), value: metrics.active, accent: true },
+            { label: t('today'), value: metrics.today },
+            { label: 'Entregados', value: metrics.delivered },
+          ].map(m => (
+            <div key={m.label} className={`rounded-2xl p-4 ${m.accent ? 'bg-brand-500 bg-opacity-10 border border-brand-500 border-opacity-20' : 'bg-surface-800 border border-white border-opacity-5'}`}>
+              <p className="text-xs text-white opacity-40 mb-1">{m.label}</p>
+              <p className={`text-3xl font-semibold ${m.accent ? 'text-brand-400' : 'text-white'}`}>
+                {m.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Mapa con todos los repartidores */}
+        <div className="bg-surface-800 rounded-2xl border border-white border-opacity-5 overflow-hidden">
+          <div className="px-4 py-3 border-b border-white border-opacity-5 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${driverMarkers.length > 0 ? 'bg-green-400 animate-pulse' : 'bg-white opacity-20'}`} />
+            <p className="text-sm font-medium">Repartidores en vivo</p>
+            <span className="text-xs text-white opacity-30 ml-auto">
+              {driverMarkers.length > 0 ? `${driverMarkers.length} activo${driverMarkers.length !== 1 ? 's' : ''}` : 'Sin repartidores activos'}
+            </span>
+          </div>
+          <DynamicMap
+            driverPosition={driverMarkers[0] ?? null}
+            height="300px"
+          />
+        </div>
+
+        {/* Lista de pedidos */}
+        <div className="bg-surface-800 rounded-2xl border border-white border-opacity-5">
+
+          {/* Filtros */}
+          <div className="px-4 py-3 border-b border-white border-opacity-5 flex gap-2 overflow-x-auto">
+            {['all', 'pending', 'preparing', 'on_the_way', 'delivered'].map(s => (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${filter === s
+                  ? 'bg-brand-500 text-white'
+                  : 'text-white opacity-40 hover:opacity-70'
+                  }`}
+              >
+                {s === 'all' ? 'Todos' : STATUS_LABELS[s]}
+                {s === 'all' && ` (${orders.length})`}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabla */}
+          <div className="divide-y divide-white divide-opacity-5">
+            {filteredOrders.length === 0 && (
+              <p className="text-center text-white opacity-20 text-sm py-12">
+                Sin pedidos
+              </p>
+            )}
+            {filteredOrders.map(order => (
+              <div key={order.id} className="px-4 py-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
+
+                {/* Info del pedido */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xs text-white opacity-30 font-mono">
+                      #{order.id.slice(0, 8)}
+                    </p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[order.status]}`}>
+                      {STATUS_LABELS[order.status]}
+                    </span>
+                    {/* Indicador en vivo */}
+                    {positions[order.id] && (
+                      <span className="flex items-center gap-1 text-xs text-green-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                        En vivo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm truncate">{order.addressFrom} → {order.addressTo}</p>
+                  <p className="text-xs text-white opacity-30 mt-0.5">
+                    Cliente: {order.customer?.name}
+                    {order.driver && ` · Repartidor: ${order.driver.name}`}
+                  </p>
+                </div>
+
+                {/* Hora */}
+                <p className="text-xs text-white opacity-20 flex-shrink-0">
+                  {new Date(order.createdAt).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-surface-900 flex items-center justify-center">
+      <div className="w-10 h-10 bg-brand-500 rounded-xl animate-pulse" />
     </div>
   );
 }

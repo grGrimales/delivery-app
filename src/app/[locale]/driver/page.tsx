@@ -57,6 +57,27 @@ export default function DriverPage() {
     if (status === 'delivered') setOrder(null);
   };
 
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (order) return;
+    apiFetch<Order[]>('/orders/pending')
+      .then(setPendingOrders)
+      .catch(() => setPendingOrders([]));
+  }, [order]);
+
+  const handleAcceptOrder = async (orderId: string) => {
+    try {
+      const accepted = await apiFetch<Order>(`/orders/${orderId}/accept`, {
+        method: 'PATCH',
+      });
+      setOrder(accepted);
+      setPendingOrders([]);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -89,13 +110,63 @@ export default function DriverPage() {
       <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
 
         {!order ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="w-16 h-16 bg-surface-800 rounded-2xl flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <p className="text-white opacity-40 text-sm">{t('no_orders')}</p>
+          <div className="flex flex-col gap-4">
+            {pendingOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-16 h-16 bg-surface-800 rounded-2xl flex items-center justify-center">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="text-white opacity-40 text-sm">{t('no_orders')}</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-white opacity-40 uppercase tracking-wide">
+                  Pedidos disponibles
+                </p>
+                {pendingOrders.map(pending => (
+                  <div
+                    key={pending.id}
+                    className="bg-surface-800 rounded-2xl p-5 border border-white border-opacity-5"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs text-white opacity-30 font-mono">
+                        #{pending.id.slice(0, 8)}
+                      </p>
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-500 bg-opacity-10 text-yellow-400">
+                        Pendiente
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex gap-3 items-start">
+                        <div className="w-2 h-2 rounded-full bg-brand-500 mt-1.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-white opacity-30">Origen</p>
+                          <p className="text-sm">{pending.addressFrom}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-white opacity-30">Destino</p>
+                          <p className="text-sm">{pending.addressTo}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleAcceptOrder(pending.id)}
+                      className="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl py-3 text-sm transition-colors"
+                    >
+                      Aceptar pedido →
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         ) : (
           <>
