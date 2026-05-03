@@ -51,6 +51,80 @@ export default function AdminPage() {
       .finally(() => setLoading(false));
   }, []);
 
+
+  const EMPTY_ORDER = {
+    addressFrom: 'DeliveryDash Restaurant, Av. Beira Mar Norte 500, Florianópolis',
+    addressTo: '',
+    cep: '',
+    lat: undefined as number | undefined,
+    lng: undefined as number | undefined,
+  };
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newOrder, setNewOrder] = useState(EMPTY_ORDER);
+  const [creating, setCreating] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState('');
+
+  const handleCepChange = async (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setNewOrder(prev => ({ ...prev, cep: formatted, lat: undefined, lng: undefined, addressTo: '' }));
+    setCepError('');
+    if (digits.length !== 8) return;
+
+    setCepLoading(true);
+    try {
+      const viacep = await fetch(`https://viacep.com.br/ws/${digits}/json/`).then(r => r.json());
+      if (viacep.erro) { setCepError('CEP não encontrado'); return; }
+
+      const address = [viacep.logradouro, viacep.bairro, `${viacep.localidade} - ${viacep.uf}`]
+        .filter(Boolean).join(', ');
+
+      const geo = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ', Brasil')}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DeliveryDash/1.0' } }
+      ).then(r => r.json());
+
+      if (!geo.length) { setCepError('Não foi possível calcular a localização'); return; }
+
+      setNewOrder(prev => ({
+        ...prev,
+        addressTo: address,
+        lat: parseFloat(geo[0].lat),
+        lng: parseFloat(geo[0].lon),
+      }));
+    } catch {
+      setCepError('Erro ao buscar CEP');
+    } finally {
+      setCepLoading(false);
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    if (!newOrder.addressFrom.trim() || !newOrder.addressTo.trim()) return;
+    setCreating(true);
+    try {
+      const order = await apiFetch<Order>('/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          addressFrom: newOrder.addressFrom,
+          addressTo: newOrder.addressTo,
+          lat: newOrder.lat,
+          lng: newOrder.lng,
+        }),
+      });
+      setOrders(prev => [order, ...prev]);
+      setShowCreateModal(false);
+      setNewOrder(EMPTY_ORDER);
+      setCepError('');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   useEffect(() => {
     if (orders.length === 0) return;
     const socket = getTrackingSocket();
@@ -68,6 +142,8 @@ export default function AdminPage() {
         prev.map(o => o.id === data.orderId ? { ...o, status: data.status } : o)
       );
     });
+
+
 
     return () => {
       activeOrders.forEach(o => socket.emit('leave:order', o.id));
@@ -116,6 +192,13 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-4">
             <p className="text-sm text-white opacity-40">{user?.name}</p>
+
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+            >
+              + Nuevo pedido
+            </button>
             <button
               onClick={logout}
               className="text-xs text-white opacity-30 hover:opacity-60 transition-opacity"
@@ -225,7 +308,99 @@ export default function AdminPage() {
         </div>
 
       </div>
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[1000] px-4">
+          <div className="bg-surface-800 rounded-2xl p-6 w-full max-w-sm border border-white border-opacity-5">
+
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-medium text-lg">Nuevo pedido</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-white opacity-30 hover:opacity-60 transition-opacity text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+
+              {/* Origen */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-white opacity-40 uppercase tracking-wide">
+                  Origen
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: DeliveryDash Restaurant, Av. Beira Mar Norte 500"
+                  value={newOrder.addressFrom}
+                  onChange={e => setNewOrder(prev => ({ ...prev, addressFrom: e.target.value }))}
+                  className="bg-surface-900 border border-white border-opacity-10 rounded-xl px-4 py-3 text-sm text-white placeholder-white placeholder-opacity-20 outline-none focus:border-brand-500 transition-colors"
+                />
+              </div>
+
+              {/* CEP */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-white opacity-40 uppercase tracking-wide">
+                  CEP de entrega
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ex: 88010-500"
+                    value={newOrder.cep}
+                    onChange={e => handleCepChange(e.target.value)}
+                    maxLength={9}
+                    className="w-full bg-surface-900 border border-white border-opacity-10 rounded-xl px-4 py-3 text-sm text-white placeholder-white placeholder-opacity-20 outline-none focus:border-brand-500 transition-colors pr-10"
+                  />
+                  {cepLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {newOrder.lat && !cepLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-green-400" />
+                  )}
+                </div>
+                {cepError && <p className="text-xs text-red-400">{cepError}</p>}
+              </div>
+
+              {/* Destino (auto-rellenado por CEP) */}
+              {newOrder.addressTo && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-white opacity-40 uppercase tracking-wide">
+                    Dirección de entrega
+                  </label>
+                  <div className="bg-surface-900 border border-white border-opacity-10 rounded-xl px-4 py-3">
+                    <p className="text-sm text-white">{newOrder.addressTo}</p>
+                    {newOrder.lat && (
+                      <p className="text-xs text-white opacity-30 mt-0.5">
+                        {newOrder.lat.toFixed(5)}, {newOrder.lng!.toFixed(5)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => { setShowCreateModal(false); setCepError(''); }}
+                  className="flex-1 bg-transparent border border-white border-opacity-10 text-white text-sm font-medium py-3 rounded-xl hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateOrder}
+                  disabled={creating || !newOrder.addressFrom.trim() || !newOrder.addressTo.trim() || cepLoading}
+                  className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium py-3 rounded-xl transition-colors"
+                >
+                  {creating ? 'Creando...' : 'Crear pedido →'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
 
