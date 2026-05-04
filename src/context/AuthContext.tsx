@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
-    // Al montar, restaurar sesión desde localStorage
+    // Al montar, restaurar sesión desde localStorage y escuchar cambios entre pestañas
     useEffect(() => {
         const savedToken = localStorage.getItem('token');
         const savedUser = localStorage.getItem('user');
@@ -37,7 +37,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(JSON.parse(savedUser));
         }
         setIsLoading(false);
-    }, []);
+
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'token') {
+                if (!e.newValue) {
+                    // Logout detectado en otra pestaña
+                    setToken(null);
+                    setUser(null);
+                    disconnectSockets();
+                    if (!window.location.pathname.includes('/track/')) {
+                        router.push('/login');
+                    }
+                } else {
+                    // Login detectado en otra pestaña (opcional: podrías recargar para sincronizar)
+                    setToken(e.newValue);
+                    const newUser = localStorage.getItem('user');
+                    if (newUser) setUser(JSON.parse(newUser));
+                    connectSockets();
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [router]);
 
     const login = async (email: string, password: string) => {
         const res = await apiFetch<{ token: string; user: User }>('/auth/login', {

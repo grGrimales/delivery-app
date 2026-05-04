@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getChatSocket } from '@/lib/socket';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 type Message = {
     id: string;
@@ -12,6 +13,7 @@ type Message = {
 };
 
 export function useChat(orderId: string) {
+    const { token } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -28,36 +30,54 @@ export function useChat(orderId: string) {
 
     useEffect(() => {
         if (!orderId) return;
+        
         const socket = getChatSocket(orderId);
 
-        socket.connect();
-        socket.emit('chat:join', orderId);
+        // Forzar actualización de auth con el estado actual del localStorage
+        // @ts-ignore - socket.auth es editable en socket.io-client
+        socket.auth = { 
+            token: localStorage.getItem('token'), 
+            orderId 
+        };
 
-        socket.on('connect', () => {
+        if (socket.connected) {
+            socket.disconnect();
+        }
+        
+        socket.connect();
+
+        const onConnect = () => {
             setIsConnected(true);
             socket.emit('chat:join', orderId);
-        });
+        };
 
-        socket.on('disconnect', () => setIsConnected(false));
+        const onDisconnect = () => setIsConnected(false);
 
-        // Recibir mensaje nuevo
-        socket.on('chat:message', (msg: Message) => {
+        const onMessage = (msg: Message) => {
             setMessages(prev => {
-                // Evitar duplicados si el mensaje ya llegó por el fetch inicial o por reconexión
                 if (prev.some(m => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
-        });
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        socket.on('chat:message', onMessage);
+
+        // Unirse si ya está conectado
+        if (socket.connected) onConnect();
 
         return () => {
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.off('chat:message');
+            socket.off('connect', onConnect);
+            socket.off('disconnect', onDisconnect);
+            socket.off('chat:message', onMessage);
+            socket.disconnect();
         };
-    }, [orderId]);
+    }, [orderId, token]);
 
     const sendMessage = useCallback((content: string) => {
         const socket = getChatSocket(orderId);
+        if (!socket.connected) socket.connect();
         socket.emit('chat:message', { orderId, content });
     }, [orderId]);
 
