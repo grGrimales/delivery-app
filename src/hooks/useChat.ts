@@ -28,7 +28,7 @@ export function useChat(orderId: string) {
 
     useEffect(() => {
         if (!orderId) return;
-        const socket = getChatSocket();
+        const socket = getChatSocket(orderId);
 
         socket.connect();
         socket.emit('chat:join', orderId);
@@ -57,7 +57,7 @@ export function useChat(orderId: string) {
     }, [orderId]);
 
     const sendMessage = useCallback((content: string) => {
-        const socket = getChatSocket();
+        const socket = getChatSocket(orderId);
         socket.emit('chat:message', { orderId, content });
     }, [orderId]);
 

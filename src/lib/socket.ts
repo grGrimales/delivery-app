@@ -21,10 +21,13 @@ export function getTrackingSocket(): Socket {
   return trackingSocket;
 }
 
-export function getChatSocket(): Socket {
+export function getChatSocket(orderId?: string): Socket {
   if (!chatSocket) {
     chatSocket = io(`${WS_URL}/chat`, {
-      auth: { token: getToken() },
+      auth: { 
+        token: getToken(),
+        orderId: orderId // Permitir auth por orderId para clientes sin sesión
+      },
       autoConnect: false,
     });
   }
