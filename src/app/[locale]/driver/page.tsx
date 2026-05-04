@@ -251,6 +251,7 @@ export default function DriverPage() {
                 messages={messages}
                 onSend={sendMessage}
                 currentUserId={user?.id ?? ''}
+                customerId={order.customer.id}
               />
             )}
           </>

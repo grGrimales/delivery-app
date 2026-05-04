@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { getChatSocket } from '@/lib/socket';
+import { apiFetch } from '@/lib/api';
 
 type Message = {
     id: string;
@@ -13,6 +14,17 @@ type Message = {
 export function useChat(orderId: string) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // Cargar historial
+    useEffect(() => {
+        if (!orderId) return;
+        setLoading(true);
+        apiFetch<Message[]>(`/orders/${orderId}/messages`)
+            .then(setMessages)
+            .catch(err => console.error('Error loading chat history:', err))
+            .finally(() => setLoading(false));
+    }, [orderId]);
 
     useEffect(() => {
         if (!orderId) return;
@@ -30,7 +42,11 @@ export function useChat(orderId: string) {
 
         // Recibir mensaje nuevo
         socket.on('chat:message', (msg: Message) => {
-            setMessages(prev => [...prev, msg]);
+            setMessages(prev => {
+                // Evitar duplicados si el mensaje ya llegó por el fetch inicial o por reconexión
+                if (prev.some(m => m.id === msg.id)) return prev;
+                return [...prev, msg];
+            });
         });
 
         return () => {
@@ -45,5 +61,5 @@ export function useChat(orderId: string) {
         socket.emit('chat:message', { orderId, content });
     }, [orderId]);
 
-    return { messages, isConnected, sendMessage };
+    return { messages, isConnected, loading, sendMessage };
 }

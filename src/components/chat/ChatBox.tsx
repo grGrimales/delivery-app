@@ -14,9 +14,10 @@ type Props = {
   messages: Message[];
   onSend: (content: string) => void;
   currentUserId: string;
+  customerId?: string;
 };
 
-export default function ChatBox({ messages, onSend, currentUserId }: Props) {
+export default function ChatBox({ messages, onSend, currentUserId, customerId }: Props) {
   const t = useTranslations('chat');
   const [text, setText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -46,13 +47,13 @@ export default function ChatBox({ messages, onSend, currentUserId }: Props) {
           const isMe = msg.sender.id === currentUserId;
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isMe
-                  ? 'bg-brand-500 text-white rounded-br-sm'
-                  : 'bg-surface-900 text-white opacity-80 rounded-bl-sm'
+              <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${isMe
+                ? 'bg-brand-500 text-white rounded-br-sm'
+                : 'bg-surface-900 text-white opacity-90 rounded-bl-sm border border-white border-opacity-5'
                 }`}>
-                {!isMe && (
-                  <p className="text-xs text-white opacity-40 mb-1">{msg.sender.name}</p>
-                )}
+                <p className={`text-[10px] uppercase tracking-wider font-bold mb-1 ${isMe ? 'text-white opacity-50 text-right' : 'text-brand-400'}`}>
+                  {isMe ? 'Tú' : msg.sender.name || 'Usuario'}
+                </p>
                 {msg.content}
               </div>
             </div>

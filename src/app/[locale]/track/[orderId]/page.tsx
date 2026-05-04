@@ -169,7 +169,7 @@ export default function TrackingPage() {
             </button>
 
             {showChat && (
-              <ChatBox
+            <ChatBox
                 messages={messages}
                 onSend={sendMessage}
                 currentUserId={order.customer.id}
